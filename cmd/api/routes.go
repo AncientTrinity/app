@@ -6,20 +6,23 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-func (app *application) routes() http.Handler {
+func (a *alication) routes() http.Handler {
 	router := httprouter.New()
 
 	// default error handlers
-	router.NotFound = http.HandlerFunc(app.notFoundResponse)
-	router.MethodNotAllowed = http.HandlerFunc(app.methodNotAllowedResponse)
+	router.NotFound = http.HandlerFunc(a.notFoundResponse)
+	router.MethodNotAllowed = http.HandlerFunc(a.methodNotAllowedResponse)
 
 	// actual routes
-	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
-	router.HandlerFunc(http.MethodPost, "/v1/comments", app.createCommentHandler)
-	router.HandlerFunc(http.MethodGet, "/v1/comments/:id", app.displayCommentHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", a.healthcheckHandler)
+	router.HandlerFunc(http.MethodPost, "/v1/comments", a.createCommentHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/comments/:id", a.displayCommentHandler)
 
 
 	// wrap with panic recovery
-	return app.recoverPanic(router)
+	//return a.recoverPanic(router)
+
+	// Return the httprouter instance.
+	return router
 	
 }

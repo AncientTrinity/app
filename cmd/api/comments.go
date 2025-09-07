@@ -1,68 +1,68 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"net/http"
-	"github.com/yourusername/qod/internal/data"
+
+	"github.com/victortillett/app/internal/data"
+	"github.com/victortillett/app/internal/validator"
 )
 
-// POST /v1/comments
-func (app *application) createCommentHandler(w http.ResponseWriter, r *http.Request) {
-	var input struct {
+func (a *applicationDependencies) createCommentHandler(w http.ResponseWriter, r *http.Request) {
+	var incomingData struct {
 		Content string `json:"content"`
 		Author  string `json:"author"`
 	}
-	err := app.readJSON(w, r, &input)
+
+	err := a.readJSON(w, r, &incomingData)
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		a.badRequestResponse(w, r, err)
 		return
 	}
 
 	comment := &data.Comment{
-		Content: input.Content,
-		Author:  input.Author,
+		Content: incomingData.Content,
+		Author:  incomingData.Author,
 	}
 
-	// insert into DB
-	err = app.commentModel.Insert(comment)
+	v := validator.New()
+	data.ValidateComment(v, comment)
+	if !v.IsEmpty() {
+		a.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	err = a.commentModel.Insert(comment)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		a.serverErrorResponse(w, r, err)
 		return
 	}
 
 	headers := make(http.Header)
 	headers.Set("Location", fmt.Sprintf("/v1/comments/%d", comment.ID))
 
-	data := envelope{"comment": comment}
-	err = app.writeJSON(w, http.StatusCreated, data, headers)
+	dataResponse := envelope{"comment": comment}
+	err = a.writeJSON(w, http.StatusCreated, dataResponse, headers)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		a.serverErrorResponse(w, r, err)
 	}
 }
 
-// GET /v1/comments/:id
-func (app *application) displayCommentHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := app.readIDParam(r)
+func (a *applicationDependencies) displayCommentHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := a.readIDParam(r)
 	if err != nil {
-		app.notFoundResponse(w, r)
+		a.notFoundResponse(w, r)
 		return
 	}
 
-	comment, err := app.commentModel.Get(id)
+	comment, err := a.commentModel.Get(id)
 	if err != nil {
-		switch {
-		case errors.Is(err, data.ErrRecordNotFound):
-			app.notFoundResponse(w, r)
-		default:
-			app.serverErrorResponse(w, r, err)
-		}
+		a.notFoundResponse(w, r)
 		return
 	}
 
-	data := envelope{"comment": comment}
-	err = app.writeJSON(w, http.StatusOK, data, nil)
+	dataResponse := envelope{"comment": comment}
+	err = a.writeJSON(w, http.StatusOK, dataResponse, nil)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		a.serverErrorResponse(w, r, err)
 	}
 }

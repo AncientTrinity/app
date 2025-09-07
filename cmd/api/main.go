@@ -2,56 +2,44 @@ package main
 
 import (
 	"flag"
-	"log/slog"
+	"fmt"
+	"net/http"
 	"os"
 )
 
-const version = "1.0.0"
-
-// --- Configuration settings ---
-type configuration struct {
+ type config struct {
 	port int
-	env  string
+	dbDSN string
 }
 
-// --- Application struct with DI ---
-type application struct {
-	config configuration
-	logger *slog.Logger
+ type application struct {
+	config config
 }
 
 func main() {
-	// Load config
-	cfg := loadConfig()
+	var cfg config
 
-	// Setup logger
-	logger := setupLogger(cfg.env)
+	// Get config from flags
+	flag.IntVar(&cfg.port, "port", 8081, "API server port")
+	flag.StringVar(&cfg.dbDSN, "db-dsn", "postgres://user:password@postgres/mydb?sslmode=disable", "PostgreSQL DSN")
+	flag.Parse()
 
-	// Initialize app
 	app := &application{
 		config: cfg,
-		logger: logger,
-	}
+}
+}
+	// Just for debugging now
+	fmt.Println("Using database DSN:", cfg.dbDSN)
 
-	// Start server
-	err := app.serve()
+	// Register routes
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/healthcheck", app.healthcheckHandler)
+
+	addr := fmt.Sprintf(":%d", cfg.port)
+	fmt.Printf("Starting server on %s...\n", addr)
+
+	err := http.ListenAndServe(addr, mux)
 	if err != nil {
-		logger.Error(err.Error())
+		fmt.Println("Server error:", err)
 		os.Exit(1)
-	}
-}
-
-// loadConfig reads configuration from command line flags
-func loadConfig() configuration {
-	var cfg configuration
-	flag.IntVar(&cfg.port, "port", 4000, "API server port")
-	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
-	flag.Parse()
-	return cfg
-}
-
-// setupLogger configures the application logger based on environment
-func setupLogger(env string) *slog.Logger {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	return logger
-}
+	} 

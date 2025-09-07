@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS comments;
+
+CREATE TABLE comments (
+    id SERIAL PRIMARY KEY,
+    post_id INT NOT NULL,
+    author VARCHAR(100) NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+);

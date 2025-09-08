@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/victortillett/internal/validator"
+	"victortillett.net/basic/internal/validator"
 )
 
 type Comment struct {

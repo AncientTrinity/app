@@ -11,7 +11,8 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/victortillett/app/internal/data"
+	"victortillett.net/basic/internal/data"
+	//"victortillett.net/basic/internal/validator"
 )
 
 const appVersion = "1.0.0"

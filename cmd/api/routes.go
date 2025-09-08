@@ -1,28 +1,21 @@
+// file: cmd/api/routes.go
 package main
 
 import (
-	"net/http"
-
 	"github.com/julienschmidt/httprouter"
+	"net/http"
 )
 
-func (a *alication) routes() http.Handler {
+func (a *applicationDependencies) routes() http.Handler {
+
+	// setup a new router
 	router := httprouter.New()
-
-	// default error handlers
+	// handle 404
 	router.NotFound = http.HandlerFunc(a.notFoundResponse)
+	// handle 405
 	router.MethodNotAllowed = http.HandlerFunc(a.methodNotAllowedResponse)
-
-	// actual routes
+	// setup routes
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", a.healthcheckHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/comments", a.createCommentHandler)
-	router.HandlerFunc(http.MethodGet, "/v1/comments/:id", a.displayCommentHandler)
-
-
-	// wrap with panic recovery
-	//return a.recoverPanic(router)
-
-	// Return the httprouter instance.
-	return router
-	
+	return a.recoverPanic(router)
 }

@@ -1,8 +1,13 @@
 ## run/api: run the cmd/api application
 .PHONY: run/api
 run/api:
-	@echo '--Running application--'
-	docker compose run --rm go go run ./cmd/api -port=8081 -env=development -db-dsn=$${COMMENTS_DB_DSN}
+	@echo '-- Running application --'
+	@docker compose exec go run ./cmd/api -port=8081 -db-dsn=postgres://user:password@postgres/mydb?sslmode=disable
+
+.PHONY: migrate/up
+migrate/up:
+	@docker run --rm -v ./app/migrations:/migrations --network podman-docker-compose-files_backend migrate/migrate \
+		-path=/migrations -database "postgres://user:password@postgres/mydb?sslmode=disable" up
 
 ## db/migrations/new name=$1: create a new database migration
 .PHONY: db/migrations/new

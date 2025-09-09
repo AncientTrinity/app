@@ -1,9 +1,6 @@
 package main
 
-import (
-	
-	"net/http"
-)
+import "net/http"
 
 func (a *applicationDependencies) healthcheckHandler(w http.ResponseWriter, r *http.Request) {
 	data := envelope{

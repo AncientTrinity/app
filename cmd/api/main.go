@@ -12,7 +12,6 @@ import (
 
 	_ "github.com/lib/pq"
 	"victortillett.net/basic/internal/data"
-	//"victortillett.net/basic/internal/validator"
 )
 
 const appVersion = "1.0.0"

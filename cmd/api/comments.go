@@ -72,3 +72,91 @@ func (a *applicationDependencies) displayCommentHandler(w http.ResponseWriter, r
 		a.serverErrorResponse(w, r, err)
 	}
 }
+
+
+func (a *applicationDependencies) updateCommentHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := a.readIDParam(r)
+	if err != nil {
+		a.notFoundResponse(w, r)
+		return
+	}
+
+	comment, err := a.commentModel.Get(id)
+	if err != nil {
+		switch {
+		case err == data.ErrRecordNotFound:
+			a.notFoundResponse(w, r)
+		default:
+			a.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// Input can be partial
+	var incomingData struct {
+		Content *string `json:"content"`
+		Author  *string `json:"author"`
+	}
+
+	err = a.readJSON(w, r, &incomingData)
+	if err != nil {
+		a.badRequestResponse(w, r, err)
+		return
+	}
+
+	if incomingData.Content != nil {
+		comment.Content = *incomingData.Content
+	}
+	if incomingData.Author != nil {
+		comment.Author = *incomingData.Author
+	}
+
+	v := validator.New()
+	data.ValidateComment(v, comment)
+	if !v.IsEmpty() {
+		a.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	err = a.commentModel.Update(comment)
+	if err != nil {
+		switch {
+		case err == data.ErrEditConflict:
+			a.editConflictResponse(w, r)
+		default:
+			a.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	dataResponse := envelope{"comment": comment}
+	err = a.writeJSON(w, http.StatusOK, dataResponse, nil)
+	if err != nil {
+		a.serverErrorResponse(w, r, err)
+	}
+}
+
+func (a *applicationDependencies) deleteCommentHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := a.readIDParam(r)
+	if err != nil {
+		a.notFoundResponse(w, r)
+		return
+	}
+
+	err = a.commentModel.Delete(id)
+	if err != nil {
+		switch {
+		case err == data.ErrRecordNotFound:
+			a.notFoundResponse(w, r)
+		default:
+			a.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	err = a.writeJSON(w, http.StatusOK, envelope{"message": "comment successfully deleted"}, nil)
+	if err != nil {
+		a.serverErrorResponse(w, r, err)
+	}
+}
+

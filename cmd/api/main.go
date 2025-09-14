@@ -1,45 +1,82 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"flag"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
+	"time"
+
+	_ "github.com/lib/pq"
+	"victortillett.net/basic/internal/data"
 )
 
- type config struct {
-	port int
-	dbDSN string
+const appVersion = "1.0.0"
+
+type serverConfig struct {
+	port        int
+	environment string
+	db          struct {
+		dsn string
+	}
 }
 
- type application struct {
-	config config
+type applicationDependencies struct {
+	config       serverConfig
+	logger       *slog.Logger
+	commentModel data.CommentModel
 }
 
 func main() {
-	var cfg config
-
-	// Get config from flags
-	flag.IntVar(&cfg.port, "port", 8081, "API server port")
-	flag.StringVar(&cfg.dbDSN, "db-dsn", "postgres://user:password@postgres/mydb?sslmode=disable", "PostgreSQL DSN")
+	var settings serverConfig
+	flag.IntVar(&settings.port, "port", 8081, "Server port")
+	flag.StringVar(&settings.environment, "env", "development", "Environment")
+	flag.StringVar(&settings.db.dsn, "db-dsn", "postgres://user:password@postgres/mydb?sslmode=disable", "PostgreSQL DSN")
 	flag.Parse()
 
-	app := &application{
-		config: cfg,
-}
-}
-	// Just for debugging now
-	fmt.Println("Using database DSN:", cfg.dbDSN)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Register routes
-	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/healthcheck", app.healthcheckHandler)
-
-	addr := fmt.Sprintf(":%d", cfg.port)
-	fmt.Printf("Starting server on %s...\n", addr)
-
-	err := http.ListenAndServe(addr, mux)
+	db, err := openDB(settings)
 	if err != nil {
-		fmt.Println("Server error:", err)
+		logger.Error(err.Error())
 		os.Exit(1)
-	} 
+	}
+	defer db.Close()
+	logger.Info("database connection pool established")
+
+	app := &applicationDependencies{
+		config:       settings,
+		logger:       logger,
+		commentModel: data.CommentModel{DB: db},
+	}
+
+	apiServer := &http.Server{
+		Addr:         fmt.Sprintf(":%d", settings.port),
+		Handler:      app.routes(),
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
+	}
+
+	logger.Info("starting server", "address", apiServer.Addr, "environment", settings.environment)
+	err = apiServer.ListenAndServe()
+	logger.Error(err.Error())
+	os.Exit(1)
+}
+
+func openDB(settings serverConfig) (*sql.DB, error) {
+	db, err := sql.Open("postgres", settings.db.dsn)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err = db.PingContext(ctx); err != nil {
+		return nil, err
+	}
+	return db, nil
+}

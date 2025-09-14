@@ -1,40 +1,37 @@
-
 package main
 
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/julienschmidt/httprouter"
 )
 
-// envelope is a generic map used for JSON responses
+
 type envelope map[string]any
 
-// writeJSON marshals data to JSON and writes it with headers + status
-func (app *application) writeJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
-	js, err := json.MarshalIndent(data, "", "\t")
+func (a *applicationDependencies) writeJSON(w http.ResponseWriter, status int, data any, headers http.Header) error {
+	jsResponse, err := json.MarshalIndent(data, "", "\t")
 	if err != nil {
 		return err
 	}
-	js = append(js, '\n')
-
-	// Add any custom headers first
-	for k, v := range headers {
-		w.Header()[k] = v
+	jsResponse = append(jsResponse, '\n')
+	for key, value := range headers {
+		w.Header()[key] = value
 	}
 
-	// Always set content-type
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_, err = w.Write(js)
+	_, err = w.Write(jsResponse)
 	return err
 }
 
-// readIDParam extracts the "id" from the URL (used for GET, PATCH, DELETE)
-func (app *application) readIDParam(r *http.Request) (int64, error) {
+func (a *applicationDependencies) readIDParam(r *http.Request) (int64, error) {
 	params := httprouter.ParamsFromContext(r.Context())
 	id, err := strconv.ParseInt(params.ByName("id"), 10, 64)
 	if err != nil || id < 1 {
@@ -43,14 +40,44 @@ func (app *application) readIDParam(r *http.Request) (int64, error) {
 	return id, nil
 }
 
-// readJSON decodes JSON from request body into dst
-func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	err := decoder.Decode(dst)
+func (a *applicationDependencies) readJSON(w http.ResponseWriter, r *http.Request, destination any) error {
+	maxBytes := 256_000
+	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(destination)
 	if err != nil {
-		return err
+		var syntaxError *json.SyntaxError
+		var unmarshalTypeError *json.UnmarshalTypeError
+		var invalidUnmarshalError *json.InvalidUnmarshalError
+		var maxBytesError *http.MaxBytesError
+
+		switch {
+		case errors.As(err, &syntaxError):
+			return fmt.Errorf("badly-formed JSON (at character %d)", syntaxError.Offset)
+		case errors.Is(err, io.ErrUnexpectedEOF):
+			return errors.New("badly-formed JSON")
+		case errors.As(err, &unmarshalTypeError):
+			if unmarshalTypeError.Field != "" {
+				return fmt.Errorf("incorrect JSON type for field %q", unmarshalTypeError.Field)
+			}
+			return fmt.Errorf("incorrect JSON type (at character %d)", unmarshalTypeError.Offset)
+		case errors.Is(err, io.EOF):
+			return errors.New("body must not be empty")
+		case strings.HasPrefix(err.Error(), "json: unknown field "):
+			fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
+			return fmt.Errorf("body contains unknown key %s", fieldName)
+		case errors.As(err, &maxBytesError):
+			return fmt.Errorf("body must not be larger than %d bytes", maxBytesError.Limit)
+		case errors.As(err, &invalidUnmarshalError):
+			panic(err)
+		default:
+			return err
+		}
+	}
+	err = dec.Decode(&struct{}{})
+	if !errors.Is(err, io.EOF) {
+		return errors.New("body must only contain a single JSON value")
 	}
 	return nil
 }

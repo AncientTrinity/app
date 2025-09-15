@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -17,10 +18,13 @@ import (
 const appVersion = "1.0.0"
 
 type serverConfig struct {
-	port        int
-	environment string
-	db          struct {
+	port           int
+	environment    string
+	db             struct {
 		dsn string
+	}
+	cors struct {
+		trustedOrigins []string
 	}
 }
 
@@ -35,7 +39,16 @@ func main() {
 	flag.IntVar(&settings.port, "port", 8081, "Server port")
 	flag.StringVar(&settings.environment, "env", "development", "Environment")
 	flag.StringVar(&settings.db.dsn, "db-dsn", "postgres://user:password@postgres/mydb?sslmode=disable", "PostgreSQL DSN")
+
+	// Pass a space-separated list of origins, e.g. "http://localhost:8080"
+	var corsTrustedOrigins string
+	flag.StringVar(&corsTrustedOrigins, "cors-trusted-origins", "http://localhost:8080", "Trusted CORS origins (space separated)")
 	flag.Parse()
+
+	// Split into slice
+	if corsTrustedOrigins != "" {
+		settings.cors.trustedOrigins = strings.Fields(corsTrustedOrigins)
+	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 

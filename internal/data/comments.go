@@ -143,43 +143,53 @@ func ValidateComment(v *validator.Validator, comment *Comment) {
 	v.Check(len(comment.Author) <= 25, "author", "must not be more than 25 bytes long")
 }
 
-// Get all comments with pagination
-
+// Get all comments with pagination and sorting
 func (c CommentModel) GetAll(page, pageSize int, sort string) ([]*Comment, Metadata, error) {
-	query := fmt.Sprintf(`
-		SELECT count(*) OVER(), id, created_at, content, author, version
-		FROM comments
-		ORDER BY %s
-		LIMIT $1 OFFSET $2`, sort)
+    validSortFields := map[string]string{
+        "id":      "id",
+        "author":  "author",
+        "created": "created_at",
+    }
 
-	args := []any{pageSize, (page - 1) * pageSize}
+    sortColumn, ok := validSortFields[sort]
+    if !ok {
+        sortColumn = "id"
+    }
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+    query := fmt.Sprintf(`
+        SELECT count(*) OVER(), id, created_at, content, author, version
+        FROM comments
+        ORDER BY %s
+        LIMIT $1 OFFSET $2`, sortColumn)
 
-	rows, err := c.DB.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, Metadata{}, err
-	}
-	defer rows.Close()
+    args := []any{pageSize, (page - 1) * pageSize}
 
-	totalRecords := 0
-	comments := []*Comment{}
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    defer cancel()
 
-	for rows.Next() {
-		var cm Comment
-		err := rows.Scan(&totalRecords, &cm.ID, &cm.CreatedAt, &cm.Content, &cm.Author, &cm.Version)
-		if err != nil {
-			return nil, Metadata{}, err
-		}
-		comments = append(comments, &cm)
-	}
+    rows, err := c.DB.QueryContext(ctx, query, args...)
+    if err != nil {
+        return nil, Metadata{}, err
+    }
+    defer rows.Close()
 
-	if err = rows.Err(); err != nil {
-		return nil, Metadata{}, err
-	}
+    totalRecords := 0
+    comments := []*Comment{}
 
-	metadata := calculateMetadata(totalRecords, page, pageSize)
+    for rows.Next() {
+        var cm Comment
+        err := rows.Scan(&totalRecords, &cm.ID, &cm.CreatedAt, &cm.Content, &cm.Author, &cm.Version)
+        if err != nil {
+            return nil, Metadata{}, err
+        }
+        comments = append(comments, &cm)
+    }
 
-	return comments, metadata, nil
+    if err = rows.Err(); err != nil {
+        return nil, Metadata{}, err
+    }
+
+    metadata := calculateMetadata(totalRecords, page, pageSize)
+
+    return comments, metadata, nil
 }

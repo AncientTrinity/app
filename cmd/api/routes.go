@@ -11,9 +11,15 @@ func (a *applicationDependencies) routes() http.Handler {
 	router.NotFound = http.HandlerFunc(a.notFoundResponse)
 	router.MethodNotAllowed = http.HandlerFunc(a.methodNotAllowedResponse)
 
+	// Routes
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", a.healthcheckHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/comments", a.createCommentHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/comments/:id", a.displayCommentHandler)
+	router.HandlerFunc("PATCH", "/v1/comments/:id", a.updateCommentHandler)
+	router.HandlerFunc(http.MethodDelete, "/v1/comments/:id", a.deleteCommentHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/comments", a.listCommentsHandler)
 
-	return router
+
+	// Wrap in CORS
+	return a.enableCORS(router)
 }

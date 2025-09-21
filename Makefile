@@ -2,7 +2,7 @@
 .PHONY: run/api
 run/api:
 	@echo '-- Running application --'
-	@docker compose exec go run ./cmd/api -port=8081 -db-dsn=postgres://user:password@postgres/mydb?sslmode=disable
+	@docker compose exec go run ./cmd/api -port=8081 -db-dsn=postgres://user:password@postgres/mydb?sslmode=disable -cors-trusted-origins="http://localhost:8080"
 
 .PHONY: migrate/up
 migrate/up:

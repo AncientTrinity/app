@@ -10,6 +10,9 @@ func (a *applicationDependencies) routes() http.Handler {
 	router := httprouter.New()
 	router.NotFound = http.HandlerFunc(a.notFoundResponse)
 	router.MethodNotAllowed = http.HandlerFunc(a.methodNotAllowedResponse)
+	// Wrap router with middleware
+	handler := a.enableCORS(router)
+	handler = a.rateLimit(handler)
 
 	// Routes
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", a.healthcheckHandler)

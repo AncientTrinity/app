@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -75,10 +78,37 @@ func main() {
 		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
 	}
 
-	logger.Info("starting server", "address", apiServer.Addr, "environment", settings.environment)
-	err = apiServer.ListenAndServe()
-	logger.Error(err.Error())
+	shutdownError := make(chan error)
+
+go func() {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	s := <-quit
+
+	logger.Info("shutting down server", "signal", s.String())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	shutdownError <- apiServer.Shutdown(ctx)
+}()
+
+logger.Info("server started", "addr", apiServer.Addr, "env", settings.environment)
+
+err = apiServer.ListenAndServe()
+if !errors.Is(err, http.ErrServerClosed) {
+	logger.Error("server error", "error", err)
 	os.Exit(1)
+}
+
+err = <-shutdownError
+if err != nil {
+	logger.Error("graceful shutdown failed", "error", err)
+	os.Exit(1)
+}
+
+logger.Info("server stopped cleanly")
+
 }
 
 func openDB(settings serverConfig) (*sql.DB, error) {

@@ -35,6 +35,7 @@ type applicationDependencies struct {
 	config       serverConfig
 	logger       *slog.Logger
 	commentModel data.CommentModel
+	limiter      *rateLimiter // Add rate limiter to application dependencies
 }
 
 func main() {
@@ -67,6 +68,7 @@ func main() {
 		config:       settings,
 		logger:       logger,
 		commentModel: data.CommentModel{DB: db},
+		limiter:      newRateLimiter(5, 10), // 5 requests/sec, burst 10
 	}
 
 	apiServer := &http.Server{

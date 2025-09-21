@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url" 
 	"strconv"
 	"strings"
 
@@ -80,4 +81,17 @@ func (a *applicationDependencies) readJSON(w http.ResponseWriter, r *http.Reques
 		return errors.New("body must only contain a single JSON value")
 	}
 	return nil
+}
+
+// for pagination
+func (a *applicationDependencies) readInt(q url.Values, key string, defaultValue int) int {
+	valueStr := q.Get(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return defaultValue
+	}
+	return value
 }

@@ -18,9 +18,9 @@ import (
 const appVersion = "1.0.0"
 
 type serverConfig struct {
-	port        int
-	environment string
-	db          struct {
+	port           int
+	environment    string
+	db             struct {
 		dsn string
 	}
 	cors struct {
@@ -32,23 +32,20 @@ type applicationDependencies struct {
 	config       serverConfig
 	logger       *slog.Logger
 	commentModel data.CommentModel
-	//userModel    data.UserModel
 }
 
 func main() {
 	var settings serverConfig
-
-	// CLI flags
 	flag.IntVar(&settings.port, "port", 8081, "Server port")
 	flag.StringVar(&settings.environment, "env", "development", "Environment")
 	flag.StringVar(&settings.db.dsn, "db-dsn", "postgres://user:password@postgres/mydb?sslmode=disable", "PostgreSQL DSN")
 
+	// Pass a space-separated list of origins, e.g. "http://localhost:8080"
 	var corsTrustedOrigins string
-	flag.StringVar(&corsTrustedOrigins, "cors-trusted-origins", "", "Trusted CORS origins (space separated)")
-
+	flag.StringVar(&corsTrustedOrigins, "cors-trusted-origins", "http://localhost:8080", "Trusted CORS origins (space separated)")
 	flag.Parse()
 
-	// ✅ This must run inside main()
+	// Split into slice
 	if corsTrustedOrigins != "" {
 		settings.cors.trustedOrigins = strings.Fields(corsTrustedOrigins)
 	}
@@ -67,7 +64,6 @@ func main() {
 		config:       settings,
 		logger:       logger,
 		commentModel: data.CommentModel{DB: db},
-		//userModel:    data.UserModel{DB: db}, // if you have users.go
 	}
 
 	apiServer := &http.Server{

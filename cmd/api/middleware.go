@@ -99,17 +99,21 @@ func (rl *rateLimiter) cleanup() {
 }
 
 func (a *applicationDependencies) rateLimit(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        ip, _, err := net.SplitHostPort(r.RemoteAddr)
-        if err != nil {
-            ip = r.RemoteAddr
-        }
+	rl := newRateLimiter(5, 10) // 5 requests/sec, burst of 10
 
-        if !a.limiter.getLimiter(ip).Allow() {
-            a.errorResponseJSON(w, r, http.StatusTooManyRequests, "rate limit exceeded")
-            return
-        }
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			a.logger.Error("could not parse client IP", "error", err)
+			a.errorResponseJSON(w, r, http.StatusInternalServerError, "invalid client address")
+			return
+		}
 
-        next.ServeHTTP(w, r)
-    })
+		if !rl.getLimiter(ip).Allow() {
+			a.errorResponseJSON(w, r, http.StatusTooManyRequests, "rate limit exceeded")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

@@ -160,3 +160,29 @@ func (a *applicationDependencies) deleteCommentHandler(w http.ResponseWriter, r 
 	}
 }
 
+// for pagination
+func (a *applicationDependencies) listCommentsHandler(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	page := a.readInt(query, "page", 1)
+	pageSize := a.readInt(query, "page_size", 10)
+	sort := query.Get("sort")
+	if sort == "" {
+		sort = "id"
+	}
+
+	comments, metadata, err := a.commentModel.GetAll(page, pageSize, sort)
+	if err != nil {
+		a.serverErrorResponse(w, r, err)
+		return
+	}
+
+	dataResponse := envelope{
+		"comments": comments,
+		"metadata": metadata,
+	}
+	err = a.writeJSON(w, http.StatusOK, dataResponse, nil)
+	if err != nil {
+		a.serverErrorResponse(w, r, err)
+	}
+}
